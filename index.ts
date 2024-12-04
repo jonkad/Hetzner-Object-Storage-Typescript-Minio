@@ -21,13 +21,52 @@ export const minioClient = new Minio.Client({
   accessKey: bucketKey,
   secretKey: bucketSecret,
 });
+
+const setPolicy = async () => {
+  let setPolicy = {
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Sid: "allow-user-to-access-to-bucket",
+        Effect: "Allow",
+        Principal: {
+          AWS: `arn:aws:iam:::user/p${projectId}:${bucketKey}`,
+        },
+        Action: ["s3:GetBucketLocation", "s3:ListBucket"],
+        Resource: [`arn:aws:s3:::${bucketName}`],
+      },
+      {
+        Sid: "allow-user-to-read-objects",
+        Effect: "Deny",
+        Principal: {
+          AWS: `arn:aws:iam:::user/p${projectId}:${bucketKey}`,
+        },
+        Action: ["s3:GetObject"],
+        Resource: [`arn:aws:s3:::${bucketName}/*`],
+      },
+    ],
+  };
+
+  await minioClient
+    .setBucketPolicy(bucketName, JSON.stringify(setPolicy))
+    .then((res) => {
+      console.log(res);
+    })
+    .catch((e) => {
+      console.log(e);
+    });
+};
+
 export const s3ClientCheck = async () => {
   try {
     const exists = await minioClient.bucketExists(bucketName);
     if (exists) {
       console.log("Bucket " + bucketName + " exists.");
+      let policy = await minioClient.getBucketPolicy(bucketName);
+      console.log("Bucket Policy: ", policy);
     } else {
       await minioClient.makeBucket(bucketName, bucketRegion);
+      await setPolicy();
       console.log("Bucket " + bucketName + " created in " + bucketRegion + ".");
     }
   } catch (error) {
